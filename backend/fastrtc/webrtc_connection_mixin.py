@@ -44,6 +44,7 @@ from fastrtc.utils import (
     RTCConfigurationCallable,
     WebRTCData,
     create_message,
+    safe_send_message,
     webrtc_error_handler,
 )
 
@@ -154,7 +155,8 @@ class WebRTCConnectionMixin:
         if isinstance(webrtc_data, WebRTCData):
             webrtc_id = webrtc_data.webrtc_id
         if webrtc_id in self.connections:
-            self.data_channels[webrtc_id].send(
+            safe_send_message(
+                self.data_channels[webrtc_id],
                 create_message("update_connection", desired_state)
             )
 
@@ -474,10 +476,10 @@ class WebRTCConnectionMixin:
             @channel.on("message")
             def _(message):
                 logger.debug(f"Received message: {message}")
-                if channel.readyState == "open":
-                    channel.send(
-                        create_message("log", data=f"Server received: {message}")
-                    )
+                safe_send_message(
+                    channel,
+                    create_message("log", data=f"Server received: {message}")
+                )
 
         # handle offer
         await pc.setRemoteDescription(offer)

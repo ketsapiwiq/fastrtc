@@ -44,6 +44,7 @@ from fastrtc.utils import (
     current_channel,
     current_context,
     player_worker_decode,
+    safe_send_message,
     split_output,
 )
 
@@ -347,8 +348,7 @@ class StreamHandlerBase(ABC):
         self,
     ):
         if self.channel:
-            self.channel.send(create_message("send_input", []))
-            logger.debug("Sent send_input")
+            safe_send_message(self.channel, create_message("send_input", []))
 
     async def wait_for_args(self):
         if not self.phone_mode:
@@ -373,8 +373,7 @@ class StreamHandlerBase(ABC):
             msg: The string message to send.
         """
         if self.channel:
-            self.channel.send(msg)
-            logger.debug("Sent msg %s", msg)
+            safe_send_message(self.channel, msg)
 
     def send_message_sync(self, msg: str):
         """
@@ -843,7 +842,8 @@ class AudioCallback(AudioStreamTrack):
 
             frame = await self.queue.get()
             if isinstance(frame, CloseStream):
-                cast(DataChannel, self.channel).send(
+                safe_send_message(
+                    cast(DataChannel, self.channel),
                     create_message("end_stream", frame.msg)
                 )
                 self.stop()
@@ -941,7 +941,8 @@ class ServerToClientVideo(VideoStreamTrack):
             try:
                 next_array, outputs = split_output(next(self.generator))
                 if isinstance(outputs, CloseStream):
-                    cast(DataChannel, self.channel).send(
+                    safe_send_message(
+                        cast(DataChannel, self.channel),
                         create_message("end_stream", outputs.msg)
                     )
                     self.stop()
@@ -952,7 +953,7 @@ class ServerToClientVideo(VideoStreamTrack):
                     and self.channel
                 ):
                     self.set_additional_outputs(outputs)
-                    self.channel.send(create_message("fetch_output", []))
+                    safe_send_message(self.channel, create_message("fetch_output", []))
             except StopIteration:
                 self.stop()
                 return
@@ -1045,7 +1046,8 @@ class ServerToClientAudio(AudioStreamTrack):
             await self.start()
             data = await self.queue.get()
             if isinstance(data, CloseStream):
-                cast(DataChannel, self.channel).send(
+                safe_send_message(
+                    cast(DataChannel, self.channel),
                     create_message("end_stream", data.msg)
                 )
                 self.stop()

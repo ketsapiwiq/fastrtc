@@ -15,7 +15,7 @@ from .reply_on_pause import (
     ReplyOnPause,
 )
 from .speech_to_text import get_stt_model, stt_for_chunks
-from .utils import audio_to_float32, create_message
+from .utils import audio_to_float32, create_message, safe_send_message
 
 logger = logging.getLogger(__name__)
 
@@ -130,8 +130,7 @@ class ReplyOnStopWords(ReplyOnPause):
     ):
         """Internal async method to send a 'stopword' message via the channel."""
         if self.channel:
-            self.channel.send(create_message("stopword", ""))
-            logger.debug("Sent stopword")
+            safe_send_message(self.channel, create_message("stopword", ""))
 
     def send_stopword(self):
         """Sends a 'stopword' message asynchronously via the communication channel."""

@@ -54,6 +54,7 @@ class CloseStream:
 
 class DataChannel(Protocol):
     def send(self, message: str) -> None: ...
+    readyState: str
 
 
 def create_message(
@@ -70,6 +71,32 @@ def create_message(
     data: list[Any] | str,
 ) -> str:
     return json.dumps({"type": type, "data": data})
+
+
+def safe_send_message(channel: DataChannel | None, message: str) -> bool:
+    """
+    Safely send a message through a DataChannel, checking if it's in a valid state.
+    
+    Args:
+        channel: The DataChannel to send through, or None
+        message: The message to send
+        
+    Returns:
+        True if the message was sent successfully, False otherwise
+    """
+    if channel is None:
+        return False
+    
+    # Check if channel is in a valid state for sending
+    if not hasattr(channel, 'readyState') or channel.readyState != "open":
+        return False
+    
+    try:
+        channel.send(message)
+        return True
+    except Exception:
+        # Silently handle connection state issues - these are normal during connection teardown
+        return False
 
 
 current_channel: ContextVar[DataChannel | None] = ContextVar(
@@ -96,7 +123,8 @@ def get_current_context() -> Context:
 
 def _send_log(message: str, type: str) -> None:
     async def _send(channel: DataChannel) -> None:
-        channel.send(
+        safe_send_message(
+            channel,
             json.dumps(
                 {
                     "type": type,
@@ -192,7 +220,7 @@ async def player_worker_decode(
                 and channel()
             ):
                 set_additional_outputs(outputs)
-                cast(DataChannel, channel()).send(create_message("fetch_output", []))
+                safe_send_message(cast(DataChannel, channel()), create_message("fetch_output", []))
 
             if frame is None:
                 if isinstance(outputs, CloseStream):
